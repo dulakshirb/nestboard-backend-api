@@ -1,11 +1,12 @@
 import { Router } from 'express'
 import { validateBody } from '../middleware/validate.js';
-import { createPropertySchema, createPropertyWithVendor, type CreatePropertyInput } from '../schemas/property.js';
+import { createPropertySchema, type CreatePropertyInput } from '../schemas/property.js';
 import { logger } from '../lib/logger.js';
 import { Errors } from '../lib/errors.js';
 import { createRoomSchema, type CreateRoomInput } from '../schemas/room.js';
 import { prisma } from '../lib/prisma.js';
 import { toPropertyDTO } from '../lib/dto.js';
+import { verifyJwt } from '../middleware/auth.js';
 
 export const propertiesRouter: Router = Router()
 
@@ -68,7 +69,7 @@ propertiesRouter.get('/:id', async (req, res, next) => {
 })
 
 // Create a new property : make sure the property being created is valid
-propertiesRouter.post('/', validateBody(createPropertyWithVendor), async (req, res, next) => {
+propertiesRouter.post('/', verifyJwt, validateBody(createPropertySchema), async (req, res, next) => {
   // const newProperty = req.body as CreatePropertyInput
   // logger.info(newProperty.id)
   // PROPERTIES.push(newProperty)
@@ -77,13 +78,20 @@ propertiesRouter.post('/', validateBody(createPropertyWithVendor), async (req, r
   //   .location(`${req.baseUrl}/${newProperty.id}`)
   //   .json(newProperty)
   try {
-    const property = await prisma.property.create({ data: req.body })
+    const userId = req.user?.id;
+    if (!userId) throw Errors.unauthenticated()
+    const property = await prisma.property.create({
+      data: {
+        ...req.body,
+        vendorId: userId
+      }
+    });
     res
       .status(201)
       .location(`${req.baseUrl}/${property.id}`)
-      .json(property)
+      .json(property);
   } catch (err) {
-    next(err)
+    next(err);
   }
 })
 

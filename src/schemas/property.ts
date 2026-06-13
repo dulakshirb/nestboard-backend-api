@@ -12,8 +12,8 @@ export const createPropertySchema = z.object({
   imageUrl: z.url(),
 }).strict()
 
-export const createPropertyWithVendor = createPropertySchema.extend({
-  vendorId: z.uuid()
-})
+// export const createPropertyWithVendor = createPropertySchema.extend({
+//   vendorId: z.uuid()
+// })
 
 export type CreatePropertyInput = z.infer<typeof createPropertySchema>
