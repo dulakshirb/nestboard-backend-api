@@ -1,12 +1,14 @@
 import { Router } from "express";
 import { generateRefreshToken, hashToken, signAccessToken } from "../lib/tokens.js";
 import { prisma } from "../lib/prisma.js";
-import type { User } from "../generated/client.js";
+import { Role, type User } from "../generated/client.js";
 import { validateBody } from "../middleware/validate.js";
 import { loginSchema, registerSchema } from "../schemas/auth.js";
 import { Errors } from "../lib/errors.js";
 import argon2 from "argon2";
 import { requireRole, verifyJwt } from "../middleware/auth.js";
+import { createRemoteJWKSet, jwtVerify } from "jose";
+import { env } from "../lib/env.js";
 
 export const authRouter = Router();
 
@@ -58,9 +60,17 @@ authRouter.post('/refresh', async (req, res, next) => {
     if (!refreshToken) throw Errors.unauthenticated('Missing refresh token');
 
     const stored = await prisma.refreshToken.findFirst({
-      where: { tokenHash: hashToken(refreshToken), revokedAt: null, expiresAt: { gt: new Date() } },
+      where: { tokenHash: hashToken(refreshToken), expiresAt: { gt: new Date() } },
     });
     if (!stored) throw Errors.unauthenticated('Invalid refresh token');
+
+    if (stored.revokedAt) {
+      await prisma.refreshToken.updateMany({
+        where: { userId: stored.userId, revokedAt: null },
+        data: { revokedAt: new Date() }
+      })
+      throw Errors.unauthenticated('Reuse detected - all sessions revoked')
+    }
 
     const user = await prisma.user.findUnique({ where: { id: stored.userId } });
     if (!user) throw Errors.unauthenticated('Invalid refresh token');
@@ -82,3 +92,33 @@ authRouter.get('/me', verifyJwt, async (req, res, next) => {
     next(err);
   }
 });
+
+const GOOGLE_JWKS = createRemoteJWKSet(new URL('https://www.googleapis.com/oauth2/v3/certs'))
+
+authRouter.post('/google', async (req, res, next) => {
+  try {
+    const idToken = (req.body as { idToken?: string }).idToken
+
+    if (!idToken) throw Errors.unauthenticated('Missing idToken')
+
+    const { payload } = await jwtVerify(idToken, GOOGLE_JWKS, {
+      issuer: ['https://account.google.com', 'account.google.com'],
+      audience: env.GOOGLE_CLIENT_ID
+    })
+
+    const email = payload.email as string | undefined
+    if (!email || payload.email_verfied !== true) {
+      throw Errors.unauthenticated('Google account email not verified')
+    }
+
+    const user = await prisma.user.upsert({
+      where: { email },
+      create: { email, displayName: (payload.name as string) ?? email.split('@')[0]!, role: Role.USER },
+      update: {}
+    })
+
+    res.json(await issueTokens(user))
+  } catch (err) {
+    next(err)
+  }
+})
