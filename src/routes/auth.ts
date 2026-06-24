@@ -93,32 +93,32 @@ authRouter.get('/me', verifyJwt, async (req, res, next) => {
   }
 });
 
-const GOOGLE_JWKS = createRemoteJWKSet(new URL('https://www.googleapis.com/oauth2/v3/certs'))
+// const GOOGLE_JWKS = createRemoteJWKSet(new URL('https://www.googleapis.com/oauth2/v3/certs'))
 
-authRouter.post('/google', async (req, res, next) => {
-  try {
-    const idToken = (req.body as { idToken?: string }).idToken
+// authRouter.post('/google', async (req, res, next) => {
+//   try {
+//     const idToken = (req.body as { idToken?: string }).idToken
 
-    if (!idToken) throw Errors.unauthenticated('Missing idToken')
+//     if (!idToken) throw Errors.unauthenticated('Missing idToken')
 
-    const { payload } = await jwtVerify(idToken, GOOGLE_JWKS, {
-      issuer: ['https://account.google.com', 'account.google.com'],
-      audience: env.GOOGLE_CLIENT_ID
-    })
+//     const { payload } = await jwtVerify(idToken, GOOGLE_JWKS, {
+//       issuer: ['https://account.google.com', 'account.google.com'],
+//       audience: env.GOOGLE_CLIENT_ID
+//     })
 
-    const email = payload.email as string | undefined
-    if (!email || payload.email_verfied !== true) {
-      throw Errors.unauthenticated('Google account email not verified')
-    }
+//     const email = payload.email as string | undefined
+//     if (!email || payload.email_verfied !== true) {
+//       throw Errors.unauthenticated('Google account email not verified')
+//     }
 
-    const user = await prisma.user.upsert({
-      where: { email },
-      create: { email, displayName: (payload.name as string) ?? email.split('@')[0]!, role: Role.USER },
-      update: {}
-    })
+//     const user = await prisma.user.upsert({
+//       where: { email },
+//       create: { email, displayName: (payload.name as string) ?? email.split('@')[0]!, role: Role.USER },
+//       update: {}
+//     })
 
-    res.json(await issueTokens(user))
-  } catch (err) {
-    next(err)
-  }
-})
+//     res.json(await issueTokens(user))
+//   } catch (err) {
+//     next(err)
+//   }
+// })

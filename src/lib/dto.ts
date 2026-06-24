@@ -6,6 +6,7 @@ export type PropertyDTO = {
   title: string;
   description: string;
   location: string;
+  city: string,
   type: 'House' | 'Villa' | 'Apartment' | 'Hotel';
   price: string;
   rating: number;
@@ -35,6 +36,7 @@ export function toPropertyDTO(p: PrismaProperty & { rooms?: PrismaRoom[] }): Pro
     title: p.title,
     description: p.description,
     location: `${p.address}, ${p.city}`,
+    city: p.city,
     type: TYPE_LABEL[p.type],
     price: minPrice !== null ? compactKilo(minPrice) : '',
     rating: Number(p.rating.toString()),

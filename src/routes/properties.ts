@@ -91,13 +91,20 @@ propertiesRouter.delete('/:id', async (req, res, next) => {
   }
 })
 
-// propertiesRouter.get('/:id/rooms', (req, res) => {
-//   const property = PROPERTIES.find(p => p.id === req.params.id);
-//   if (!property) {
-//     throw Errors.notFound('Property')
-//   }
-//   res.json(ROOMS.filter(r => r.propertyId === req.params.id));
-// })
+propertiesRouter.get("/:id/rooms", async (req, res, next) => {
+  try {
+    const property = await prisma.property.findUnique({
+      where: { id: req.params.id },
+      include: { rooms: true },
+    });
+
+    if (!property) throw Errors.notFound("Property");
+
+    res.json(property.rooms);
+  } catch (err) {
+    next(err);
+  }
+});
 
 // propertiesRouter.post('/:id/rooms', validateBody(createRoomSchema), (req, res) => {
 //   const newRoom = req.body as CreateRoomInput
